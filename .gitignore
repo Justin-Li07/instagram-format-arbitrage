@@ -1,0 +1,10 @@
+# raw scraped data and local DB stay off GitHub
+data/
+*.db
+*.sqlite
+__pycache__/
+.venv/
+node_modules/
+frontend/dist/
+.env
+.pytest_cache/
