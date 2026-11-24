@@ -210,17 +210,23 @@ def import_scan_file(
 def import_labels(session: Session, records: list[dict], labeled_by: str = "agent") -> int:
     """Upsert Format + ReelLabel, fill Reel caption/duration/posted_at, embed the hook.
 
-    Records whose reel code is not in the DB yet are skipped. Returns the number of labels upserted.
+    A record may carry "paid": true/false to flag a "Paid partnership" reel (excluded from all
+    analytics); such a record needs no format. Records whose reel code is not in the DB yet are
+    skipped. Returns the number of labels upserted.
     """
     count = 0
     for rec in records:
         code = rec.get("code")
         fmt_name = (rec.get("format") or "").strip()
-        if not code or not fmt_name:
+        if not code or (not fmt_name and "paid" not in rec):
             continue
         reel = session.scalar(select(Reel).where(Reel.code == code))
         if reel is None:
             log.warning("labels: reel %s not imported yet; skipping", code)
+            continue
+        if "paid" in rec:
+            reel.is_paid_partnership = bool(rec["paid"])
+        if not fmt_name:
             continue
 
         fmt = session.scalar(select(Format).where(Format.name == fmt_name))

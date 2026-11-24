@@ -207,3 +207,38 @@ def test_hashed_fallback_embedder():
     assert np.allclose(np.linalg.norm(m, axis=1), 1.0, atol=1e-5)
     assert np.allclose(m[0], m[1])
     assert float(m[0] @ m[2]) < 0.9
+
+
+# ---- paid partnerships --------------------------------------------------------
+
+def test_paid_partnership_reels_excluded_from_analytics(session, scan_file):
+    from app.analytics.outliers import find_outliers
+
+    import_scan_file(session, str(scan_file))
+    before = {o["code"]: o for o in find_outliers(session)}
+    assert "AAA111" in before  # 34.4M vs alice's median -> outlier
+
+    n = import_labels(session, [{"code": "AAA111", "paid": True}])
+    assert n == 0  # a paid-only record is a flag, not a format label
+    assert session.scalar(select(Reel.is_paid_partnership).where(Reel.code == "AAA111")) is True
+
+    after = find_outliers(session, min_multiple=1.0)
+    assert "AAA111" not in {o["code"] for o in after}
+    # the paid reel no longer inflates alice's median: median(55.8K, 5,181) = 30,490.5
+    alice = next(o for o in after if o["creator"] == "alice")
+    assert alice["creator_median"] == pytest.approx(30_490.5)
+
+
+def test_init_db_adds_paid_column_to_old_database(tmp_path):
+    from sqlalchemy import inspect, text
+
+    from app.db.session import init_db
+
+    engine = create_engine(f"sqlite:///{tmp_path / 'old.db'}")
+    with engine.begin() as conn:  # a reels table from before the column existed
+        conn.execute(text("CREATE TABLE reels (id INTEGER PRIMARY KEY, code VARCHAR(64))"))
+        conn.execute(text("INSERT INTO reels (id, code) VALUES (1, 'OLD1')"))
+    init_db(engine)
+    assert "is_paid_partnership" in {c["name"] for c in inspect(engine).get_columns("reels")}
+    with engine.connect() as conn:
+        assert conn.execute(text("SELECT is_paid_partnership FROM reels")).scalar() == 0

@@ -28,8 +28,25 @@ SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False
 
 
 def init_db(bind: Engine | None = None) -> None:
-    """Create all tables (no-op for ones that already exist)."""
-    Base.metadata.create_all(bind or engine)
+    """Create all tables (no-op for ones that already exist), then add any columns added later."""
+    bind = bind or engine
+    Base.metadata.create_all(bind)
+    _add_missing_columns(bind)
+
+
+# Columns added after the first release: (table, column, SQL type + default).
+_LATE_COLUMNS = [("reels", "is_paid_partnership", "BOOLEAN NOT NULL DEFAULT 0")]
+
+
+def _add_missing_columns(bind: Engine) -> None:
+    """Tiny migration step: create_all() never alters existing tables, so add new columns here."""
+    from sqlalchemy import inspect, text
+
+    insp = inspect(bind)
+    with bind.begin() as conn:
+        for table, column, ddl in _LATE_COLUMNS:
+            if table in insp.get_table_names() and column not in {c["name"] for c in insp.get_columns(table)}:
+                conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}"))
 
 
 def get_session() -> Iterator[Session]:

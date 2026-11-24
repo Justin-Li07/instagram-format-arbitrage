@@ -26,5 +26,8 @@ python -I scripts/outliers.py data/<niche>/scan-<date>.jsonl
 ## 4. Label formats
 For the top ~12 outliers: resize your tab to 1000x760 (resize_window with tabId), open https://www.instagram.com/p/<code>/, read the caption from document.querySelector('main').innerText.slice(0,300), pause the video, seek to ~20% and ~60% and zoom-screenshot the video. Label the FORMAT without looking at views: who's on screen, talking head / skit / list / comparison / text-over-B-roll, hook, beats, length. Group formats that broke out on 3+ unrelated accounts.
 
+## 4b. Paid partnerships: always exclude
+Brand-boosted reels always look like outliers, so they're ignored everywhere. When you open an outlier post and its header says "Paid partnership with …", don't label its format. Instead, add `{"code":"<code>","paid":true,"paid_with":"<brand>"}` to data/<niche>/labels-<date>.jsonl. The app then drops it from outliers, creator medians, formats and hooks.
+
 ## 5. Write data/<niche>/findings-<date>.md
 A table with: Format | creators it broke out for | followers | views | x median | length. Then 3 bullets on what stands out. Reset the tab viewport (preset desktop) and close your tab when done.

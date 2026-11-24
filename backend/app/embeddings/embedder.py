@@ -157,6 +157,7 @@ def similar_hooks(
         .join(Reel, Reel.id == HookEmbedding.reel_id)
         .join(ReelLabel, ReelLabel.reel_id == HookEmbedding.reel_id)
         .where(HookEmbedding.model == emb.model_name, HookEmbedding.dim == emb.dim)
+        .where(Reel.is_paid_partnership.is_(False))  # paid partnerships are never suggested
     ).all()
     rows = [r for r in rows if r[1].id != exclude_id]
     if not rows:

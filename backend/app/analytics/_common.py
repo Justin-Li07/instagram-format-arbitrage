@@ -126,8 +126,14 @@ def load_reels(session: Session, niche: str | None = None, creator_id: int | Non
     """Load every reel (with >=1 snapshot) plus creator, latest followers, label and all snapshots.
 
     Also fills creator_median (median of latest views over the creator's reels) and multiple.
+    Paid-partnership reels are skipped entirely: they're brand-boosted, so they always look like
+    outliers and would also inflate creator medians.
     """
-    q = select(Reel, Creator).join(Creator, Reel.creator_id == Creator.id)
+    q = (
+        select(Reel, Creator)
+        .join(Creator, Reel.creator_id == Creator.id)
+        .where(Reel.is_paid_partnership.is_(False))
+    )
     if niche:
         q = q.where(Creator.niche == niche)
     if creator_id is not None:

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, Float, ForeignKey, Integer, LargeBinary, String, Text
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, LargeBinary, String, Text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -62,6 +62,8 @@ class Reel(Base):
     duration_s: Mapped[float | None] = mapped_column(Float, nullable=True)
     posted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     first_seen_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    # "Paid partnership with ..." reels are brand-boosted, so they're excluded from all analytics.
+    is_paid_partnership: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
 
     creator: Mapped[Creator] = relationship(back_populates="reels")
     snapshots: Mapped[list["ReelSnapshot"]] = relationship(back_populates="reel")
