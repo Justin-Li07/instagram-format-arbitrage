@@ -1,6 +1,6 @@
 """Import every data/<niche>/scan-*.jsonl and labels-*.jsonl into the DB.
 
-Scan files already imported (matching ScrapeRun.source) are skipped. Label files are
+Scan files already imported are skipped unless they gained creators since (then re-read). Label files are
 upserts, so re-running them is harmless. Usage (from backend/):
 
     python scripts/import_all.py [--data-dir ../data]
@@ -29,17 +29,21 @@ def main(argv: list[str] | None = None) -> int:
 
     init_db()
     with SessionLocal() as session:
-        done = set(session.scalars(select(ScrapeRun.source)))
+        before = {r.source: r.creators_count for r in session.scalars(select(ScrapeRun))}
         n_new = n_skip = 0
         for path in sorted(data_dir.glob("*/scan-*.jsonl")):
-            if source_for_path(path) in done:
+            source = source_for_path(path)
+            run = import_scan_file(session, str(path))  # re-reads files that grew since last import
+            rel = path.relative_to(data_dir)
+            if source not in before:
+                n_new += 1
+                print(f"import {rel}: run {run.id}, {run.creators_count} creators, {run.reels_count} reels")
+            elif run.creators_count > before[source]:
+                n_new += 1
+                print(f"update {rel}: run {run.id}, {before[source]} -> {run.creators_count} creators")
+            else:
                 n_skip += 1
-                print(f"skip   {path.relative_to(data_dir)} (already imported)")
-                continue
-            run = import_scan_file(session, str(path))
-            n_new += 1
-            print(f"import {path.relative_to(data_dir)}: run {run.id}, "
-                  f"{run.creators_count} creators, {run.reels_count} reels")
+                print(f"skip   {rel} (already imported)")
         n_labels = 0
         for path in sorted(data_dir.glob("*/labels-*.jsonl")):
             n = import_labels_file(session, str(path))

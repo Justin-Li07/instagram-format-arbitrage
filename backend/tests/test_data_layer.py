@@ -106,6 +106,20 @@ def test_import_twice_same_row_counts(session, scan_file):
     assert counts1 == counts2 == [1, 2, 2, 5, 5]
 
 
+def test_reimport_file_that_grew(session, scan_file):
+    """Scrapers append to the file while running; a later import must pick up the new lines."""
+    run1 = import_scan_file(session, str(scan_file))
+    assert run1.creators_count == 2
+    with scan_file.open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps({"u": "carol", "f": "12K", "r": ["CCC111 400K", "CCC222 3,100"]}) + "\n")
+    run2 = import_scan_file(session, str(scan_file))
+    assert run2.id == run1.id  # same run, not a second scrape
+    assert run2.creators_count == 3 and run2.reels_count == 7
+    # no duplicate snapshots for the creators/reels already imported
+    assert [count(session, m) for m in (ScrapeRun, Creator, CreatorSnapshot, Reel, ReelSnapshot)] == [1, 3, 3, 7, 7]
+    assert session.scalar(select(ReelSnapshot.scrape_run_id).join(Reel).where(Reel.code == "CCC111")) == run1.id
+
+
 def test_two_scrapes_two_snapshots_per_reel(session, scan_file):
     import_scan_file(session, str(scan_file), scraped_at=datetime(2026, 11, 20, 9))
     import_scan_file(session, str(scan_file), scraped_at=datetime(2026, 11, 21, 9))

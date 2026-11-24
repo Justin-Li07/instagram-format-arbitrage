@@ -93,16 +93,19 @@ def import_scan_records(
     niche: str,
     scraped_at: datetime,
     source: str = "api",
+    run: ScrapeRun | None = None,
 ) -> ScrapeRun:
     """Add one ScrapeRun plus a snapshot per creator and per reel. Never overwrites snapshots.
 
     A reel/creator that already has a snapshot at exactly this `scraped_at` is not snapshotted again.
+    Pass `run` to add records to an existing run (used when a scan file grew after it was imported).
     """
     scraped_at = _naive_utc(scraped_at)
-    # started_at = when the scrape happened (== scraped_at of every snapshot in this run)
-    run = ScrapeRun(niche=niche, source=source, started_at=scraped_at, creators_count=0, reels_count=0)
-    session.add(run)
-    session.flush()
+    if run is None:
+        # started_at = when the scrape happened (== scraped_at of every snapshot in this run)
+        run = ScrapeRun(niche=niche, source=source, started_at=scraped_at, creators_count=0, reels_count=0)
+        session.add(run)
+        session.flush()
 
     seen_creators: set[int] = set()
     seen_reels: set[int] = set()
@@ -176,7 +179,12 @@ def import_scan_file(
     niche: str | None = None,
     scraped_at: datetime | None = None,
 ) -> ScrapeRun:
-    """Import a scan-*.jsonl file. Idempotent: the same file at the same scraped_at returns the existing run."""
+    """Import a scan-*.jsonl file.
+
+    Idempotent: the same file at the same scraped_at returns the existing run, unless the file now
+    has more creators than that run recorded (scrapers append while running). Then the file is
+    re-read into the same run; already-stored snapshots are not duplicated.
+    """
     p = Path(path)
     niche = niche or p.resolve().parent.name
     if scraped_at is None:
@@ -187,9 +195,16 @@ def import_scan_file(
     existing = session.scalar(
         select(ScrapeRun).where(ScrapeRun.source == source, ScrapeRun.started_at == scraped_at).limit(1)
     )
+    records = read_jsonl(p)
     if existing is not None:
-        return existing
-    return import_scan_records(session, read_jsonl(p), niche=niche, scraped_at=scraped_at, source=source)
+        usernames = {(r.get("u") or r.get("username") or "").strip().lstrip("@") for r in records}
+        usernames.discard("")
+        if len(usernames) <= existing.creators_count:
+            return existing
+        return import_scan_records(
+            session, records, niche=niche, scraped_at=scraped_at, source=source, run=existing
+        )
+    return import_scan_records(session, records, niche=niche, scraped_at=scraped_at, source=source)
 
 
 def import_labels(session: Session, records: list[dict], labeled_by: str = "agent") -> int:
