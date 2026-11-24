@@ -16,6 +16,18 @@ import {
 
 type YKey = 'views' | 'multiple'
 
+/** Fixed log-scale range + one tick per power of ten (100, 1K, 10K, ...).
+ * Without explicit ticks recharts puts a label at every distinct data value, which overlap. */
+function logAxis(values: number[]): { domain: [number, number]; ticks: number[] } {
+  if (values.length === 0) return { domain: [1, 10], ticks: [1, 10] }
+  let lo = Math.floor(Math.log10(Math.min(...values)))
+  let hi = Math.ceil(Math.log10(Math.max(...values)))
+  if (hi === lo) hi = lo + 1
+  const ticks: number[] = []
+  for (let e = lo; e <= hi; e++) ticks.push(10 ** e)
+  return { domain: [10 ** lo, 10 ** hi], ticks }
+}
+
 interface Pt extends VelocityPoint {
   x: number
   y: number
@@ -42,9 +54,11 @@ export default function VelocityPage() {
   const points = useApi(() => api.velocity(niche), [niche])
   const buckets = useApi(() => api.velocityBuckets(niche), [niche])
 
-  const { byBucket, dropped } = useMemo(() => {
+  const { byBucket, dropped, xAxis, yAxis } = useMemo(() => {
     const groups: Record<string, Pt[]> = {}
     let dropped = 0
+    const xs: number[] = []
+    const ys: number[] = []
     for (const p of asArray<VelocityPoint>(points.data)) {
       const x = p.followers ?? 0
       const y = (yKey === 'views' ? p.views : p.multiple) ?? 0
@@ -53,8 +67,10 @@ export default function VelocityPage() {
         continue // log scale can't show 0 / null
       }
       ;(groups[p.bucket] ??= []).push({ ...p, x, y })
+      xs.push(x)
+      ys.push(y)
     }
-    return { byBucket: groups, dropped }
+    return { byBucket: groups, dropped, xAxis: logAxis(xs), yAxis: logAxis(ys) }
   }, [points.data, yKey])
 
   const bucketOrder = [...BUCKETS, ...Object.keys(byBucket).filter((b) => !(BUCKETS as string[]).includes(b))]
@@ -114,7 +130,9 @@ export default function VelocityPage() {
                       dataKey="x"
                       name="Followers"
                       scale="log"
-                      domain={['auto', 'auto']}
+                      domain={xAxis.domain}
+                      ticks={xAxis.ticks}
+                      interval={0}
                       allowDataOverflow
                       stroke={chartTheme.axis}
                       fontSize={12}
@@ -126,7 +144,9 @@ export default function VelocityPage() {
                       dataKey="y"
                       name={yKey}
                       scale="log"
-                      domain={['auto', 'auto']}
+                      domain={yAxis.domain}
+                      ticks={yAxis.ticks}
+                      interval={0}
                       allowDataOverflow
                       stroke={chartTheme.axis}
                       fontSize={12}
