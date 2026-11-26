@@ -49,6 +49,9 @@ def main(argv: list[str] | None = None) -> int:
             n = import_labels_file(session, str(path))
             n_labels += n
             print(f"labels {path.relative_to(data_dir)}: {n} labels upserted")
+    from purge_paid import purge  # noqa: E402  (same folder)
+
+    print(f"purged paid partnerships: {purge(data_dir)}")
     print(f"done: {n_new} scan files imported, {n_skip} skipped, {n_labels} labels")
     return 0
 

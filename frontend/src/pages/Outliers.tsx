@@ -8,7 +8,11 @@ export default function OutliersPage() {
   const [niche] = useNiche()
   const [minMultiple, setMinMultiple] = useState(10)
   const [smallOnly, setSmallOnly] = useState(false)
-  const state = useApi(() => api.outliers({ niche, min_multiple: minMultiple, limit: 200 }), [niche, minMultiple])
+  const [breakouts, setBreakouts] = useState(true)
+  const state = useApi(
+    () => (breakouts ? api.breakouts({ niche, limit: 200 }) : api.outliers({ niche, min_multiple: minMultiple, limit: 200 })),
+    [niche, minMultiple, breakouts],
+  )
 
   const rows = useMemo(() => {
     const all = asArray<Outlier>(state.data)
@@ -19,9 +23,17 @@ export default function OutliersPage() {
     <>
       <PageHeader
         title="Outlier reels"
-        subtitle="Reels far above their creator's median. Small creators: under 10K followers with 100K+ views."
+        subtitle={
+          breakouts
+            ? 'Breakouts: under 10K followers with 500K+ views (1M+ best; 1–5K followers is the sweet spot). Paid partnerships excluded.'
+            : "Reels far above their creator's median. Small creators: under 10K followers with 100K+ views."
+        }
         right={
           <div className="controls">
+            <label className="toggle">
+              <input type="checkbox" checked={breakouts} onChange={(e) => setBreakouts(e.target.checked)} />
+              <span>Breakouts (&lt;10K, 500K+)</span>
+            </label>
             <label className="toggle">
               <input type="checkbox" checked={smallOnly} onChange={(e) => setSmallOnly(e.target.checked)} />
               <span>Small creators only</span>
@@ -63,6 +75,8 @@ export default function OutliersPage() {
                     <td className="cell-strong">
                       <NLink to={`/creators/${encodeURIComponent(r.creator)}`}>@{r.creator}</NLink>
                       {r.is_small_creator && <span className="tag tag-green">small</span>}
+                      {r.sweet_spot && <span className="tag tag-green">1–5K</span>}
+                      {r.views_tier === '1M+' && <span className="tag tag-green">1M+</span>}
                     </td>
                     {!niche && <td className="muted">{r.niche}</td>}
                     <td className="num">{fmtNum(r.followers)}</td>

@@ -36,6 +36,10 @@ export interface ScrapeRun {
 
 /** GET /api/outliers (find_outliers) */
 export interface Outlier {
+  views_per_follower?: number | null
+  views_tier?: string | null
+  follower_tier?: string | null
+  sweet_spot?: boolean | null
   code: string
   url: string
   creator: string
@@ -260,6 +264,8 @@ export const api = {
     request<ScrapeRun>('/ingest/scan', { method: 'POST', body: JSON.stringify(body) }),
   ingestLabels: (records: LabelRecord[]) =>
     request<unknown>('/ingest/labels', { method: 'POST', body: JSON.stringify({ records }) }),
+  breakouts: (p: { niche?: string | null; limit?: number }) =>
+    request<Outlier[]>(`/breakouts${qs({ niche: n(p.niche), limit: p.limit })}`),
   outliers: (p: { niche?: string | null; min_multiple?: number; limit?: number }) =>
     request<Outlier[]>(`/outliers${qs({ niche: n(p.niche), min_multiple: p.min_multiple, limit: p.limit })}`),
   formats: (p: { niche?: string | null; weeks?: number }) =>

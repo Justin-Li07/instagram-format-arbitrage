@@ -75,6 +75,10 @@ class Outlier(_Open):
     creator_median: float | None = None
     multiple: float | None = None
     is_small_creator: bool | None = None
+    views_per_follower: float | None = None
+    views_tier: str | None = None
+    follower_tier: str | None = None
+    sweet_spot: bool | None = None
     format: str | None = None
     hook: str | None = None
 
